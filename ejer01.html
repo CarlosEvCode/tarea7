@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ejercicio 01 - Clasificador</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.10/lib/p5.min.js"></script>
+    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        margin: 20px;
+      }
+      #contenedor-canvas {
+        display: inline-block;
+        margin: 10px auto;
+      }
+      p {
+        font-size: 18px;
+        margin: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Clasificador con Cámara y grafico de barras</h1>
+
+    <div id="contenedor-canvas"></div>
+
+    <p id="descripcion">Cargando modelo...</p>
+    <p id="confianza"></p>
+
+    <div style="width: 450px; margin: 20px auto">
+      <canvas id="graficaCanvas" width="400" height="200"></canvas>
+    </div>
+
+    <script>
+      let classifier;
+      let video;
+      let flippedVideo;
+      let chartInstance;
+      let imageModelURL = "./model/";
+
+      function preload() {
+        classifier = ml5.imageClassifier(imageModelURL + "model.json");
+      }
+
+      function setup() {
+        let c = createCanvas(320, 240);
+        c.parent("contenedor-canvas");
+
+        video = createCapture(VIDEO);
+        video.size(320, 240);
+        video.hide();
+
+        flippedVideo = ml5.flipImage(video);
+
+        initChart();
+        classifyVideo();
+      }
+
+      function draw() {
+        background(0);
+        image(flippedVideo, 0, 0, width, height);
+      }
+
+      function classifyVideo() {
+        flippedVideo = ml5.flipImage(video);
+        classifier.classify(flippedVideo, gotResult);
+      }
+
+      function initChart() {
+        const ctx = document.getElementById("graficaCanvas").getContext("2d");
+        const labels = [
+          "Celular",
+          "ConsolaRetro",
+          "Billetera",
+          "usb",
+          "audifonos",
+        ];
+
+        const data = {
+          labels: labels,
+          datasets: [
+            {
+              axis: "y",
+              label: "Confianza (%)",
+              data: [0, 0, 0, 0, 0],
+              fill: false,
+              backgroundColor: [
+                "rgba(255, 99, 132, 0.2)",
+                "rgba(255, 159, 64, 0.2)",
+                "rgba(255, 205, 86, 0.2)",
+                "rgba(75, 192, 192, 0.2)",
+                "rgba(54, 162, 235, 0.2)",
+              ],
+              borderColor: [
+                "rgb(255, 99, 132)",
+                "rgb(255, 159, 64)",
+                "rgb(255, 205, 86)",
+                "rgb(75, 192, 192)",
+                "rgb(54, 162, 235)",
+              ],
+              borderWidth: 1,
+            },
+          ],
+        };
+
+        chartInstance = new Chart(ctx, {
+          type: "bar",
+          data: data,
+          options: {
+            indexAxis: "y",
+            scales: {
+              x: {
+                beginAtZero: true,
+                max: 100,
+              },
+            },
+          },
+        });
+      }
+
+      function gotResult(error, results) {
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        let confidences = {};
+        for (let i = 0; i < results.length; i++) {
+          confidences[results[i].label] = results[i].confidence * 100;
+        }
+
+        let updatedData = chartInstance.data.labels.map((label) => {
+          return confidences[label] !== undefined ? confidences[label] : 0;
+        });
+
+        chartInstance.data.datasets[0].data = updatedData;
+        chartInstance.update();
+
+        let topResult = results[0];
+        document.getElementById("descripcion").innerText =
+          `Objeto: ${topResult.label}`;
+        document.getElementById("confianza").innerText =
+          `Confianza: ${(topResult.confidence * 100).toFixed(2)}%`;
+
+        classifyVideo();
+      }
+    </script>
+  </body>
+</html>
